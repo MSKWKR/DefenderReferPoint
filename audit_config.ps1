@@ -4,6 +4,8 @@ param(
     [switch]$Revert
 )
 
+$mdiIdentity = "FDS-MDI-Autobot"
+
 # Backup current config into JSON
 $fullConfig = Get-MDIConfiguration -Mode Domain -Configuration All -Identity $mdiIdentity -WarningAction SilentlyContinue
 $backupPath = "$PSScriptRoot\AuditConfigBackup.json"
