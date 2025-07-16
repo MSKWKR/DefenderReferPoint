@@ -1,5 +1,8 @@
 # This file configures Advanced Audit Policies needed for Defender Identity Sensor
 
+Install-Module -Name DefenderForIdentity
+Import-Module -Name DefenderForIdentity
+
 param(
     [switch]$Revert
 )
