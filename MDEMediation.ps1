@@ -16,6 +16,7 @@ else{
 
 
 $regParams = @{
+    # Set User Account Control (UAC) to automatically deny elevation requests
     UACHardening = @{  
         Key         = "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System"
         ValueName   = "ConsentPromptBehaviorUser"
@@ -23,6 +24,7 @@ $regParams = @{
         Type        = "DWORD"
     }
 
+    # Disable 'Enumerate administrator accounts on elevation'
     adminEnumerateLock = @{
         Key         = "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\CredUI"
         ValueName   = "EnumerateAdministrators"
@@ -30,6 +32,7 @@ $regParams = @{
         Type        = "DWORD"
     }
 
+    # Disable Solicited Remote Assistance
     solicitRemoteAccessLock = @{
         Key         = "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services"
         ValueName   = "fAllowToGetHelp"
@@ -37,6 +40,7 @@ $regParams = @{
         Type        = "DWORD"
     }
 
+    # Disable Anonymous enumeration of shares
     anonymousEnumerationLock = @{
         Key         = "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa"
         ValueName   = "RestrictAnonymous"
@@ -44,9 +48,106 @@ $regParams = @{
         Type        = "DWORD"
     }
 
+    # Set default behavior for 'AutoRun' to 'Enabled: Do not execute any autorun commands'
     disableAutoRunCommand = @{
         Key         = "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer"
         ValueName   = "NoAutoRun"
+        Value       = 1
+        Type        = "DWORD"        
+    }
+
+    # Enable 'Local Security Authority (LSA) protection'
+    enableLSA = @{
+        Key         = "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa"
+        ValueName   = "RunAsPPL"
+        Value       = 1
+        Type        = "DWORD"         
+    }
+
+    # Set controlled folder access to enabled or audit mode
+    controlledFolderAccess = @{
+        Key         = "HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\Controlled Folder Access"
+        ValueName   = "EnableControlledFolderAccess"
+        Value       = 1
+        Type        = "DWORD"         
+    }
+
+    # Disable 'Autoplay for non-volume devices'
+    disableNonVolumeAutoplay = @{
+        Key         = "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\Explorer"
+        ValueName   = "NoAutoplayfornonVolume"
+        Value       = 1
+        Type        = "DWORD"
+    }
+
+    # Disable 'Autoplay' for all drives
+    disableDriverAutoplay = @{
+        Key         = "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer"
+        ValueName   = "NoDriveTypeAutoRun"
+        Value       = 255
+        Type        = "DWORD"
+    }
+
+    # Set LAN Manager authentication level to 'Send NTLMv2 response only. Refuse LM & NTLM'
+    refuseNTLM = @{
+        Key         = "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa"
+        ValueName   = "LmCompatibilityLevel"
+        Value       = 5
+        Type        = "DWORD"        
+    }
+
+    # Disable 'Allow Basic authentication' for WinRM Client
+    disableBasicAuthenCLient = @{
+        Key         = "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WinRM\Client"
+        ValueName   = "AllowBasic"
+        Value       = 0
+        Type        = "DWORD" 
+    }
+
+    # Disable 'Allow Basic authentication' for WinRM Service
+    disableBasicAuthenService = @{
+        Key         = "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WinRM\Service"
+        ValueName   = "AllowBasic"
+        Value       = 0
+        Type        = "DWORD" 
+    }
+
+    # Set IPv6 source routing to highest protection
+    ipv6Protection = @{
+        Key         = "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters"
+        ValueName   = "DisableIPSourceRouting"
+        Value       = 2
+        Type        = "DWORD"        
+    }
+
+    # Disable IP source routing
+    ipv4Protection = @{
+        Key         = "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters"
+        ValueName   = "DisableIPSourceRouting"
+        Value       = 2
+        Type        = "DWORD"         
+    }
+
+    # Disable the local storage of passwords and credentials
+    disableLocalCredStorage = @{
+        Key         = "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa"
+        ValueName   = "DisableDomainCreds"
+        Value       = 1
+        Type        = "DWORD"        
+    }
+
+    # Enable 'Network Protection'
+    enableNetworkProtection = @{
+        Key         = "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\Network Protection"
+        ValueName   = "EnableNetworkProtection"
+        Value       = 1
+        Type        = "DWORD"          
+    }
+
+    # Turn on PUA protection in block mode
+    enablePUAProtection = @{
+        Key         = "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows Defender"
+        ValueName   = "PUAProtection"
         Value       = 1
         Type        = "DWORD"        
     }
@@ -55,5 +156,6 @@ $regParams = @{
 
 
 foreach($paramBlock in $regParams.Values){
-    Set-GPRegistryValue -Name $customGPOName @paramBlock
+    Set-GPRegistryValue -Name $customGPOName @paramBlock -Verbose
 }
+Write-Host "Finished creating GPO."
