@@ -151,6 +151,30 @@ $regParams = @{
         Value       = 1
         Type        = "DWORD"        
     }
+
+    # Enable 'Require domain users to elevate when setting a network's location'
+    elevateNetworkLocation = @{
+        Key         = "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\Network Connections"
+        ValueName   = "NC_StdDomainUserSetLocation"
+        Value       = 1
+        Type        = "DWORD"        
+    }
+
+    # Disable 'Installation and configuration of Network Bridge on your DNS domain network'
+    disableNetworkBridge = @{
+        Key         = "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\Network Connections"
+        ValueName   = "NC_AllowNetBridge_NLA"
+        Value       = 0
+        Type        = "DWORD"        
+    }
+
+    # Enable 'Microsoft network client: Digitally sign communications (always)'
+    enableDigitalSignComms = @{
+        Key         = "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\LanmanWorkstation\Parameters"
+        ValueName   = "RequireSecuritySignature"
+        Value       = 1
+        Type        = "DWORD"         
+    }
 }
 
 
@@ -158,4 +182,6 @@ $regParams = @{
 foreach($paramBlock in $regParams.Values){
     Set-GPRegistryValue -Name $customGPOName @paramBlock -Verbose
 }
+
+gpupdate /force
 Write-Host "Finished creating GPO."
