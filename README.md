@@ -6,7 +6,7 @@
 ## Installation
 1. Download the package and place the folder within WindowsPowerShell Module path.  
 eg: *`C:\ProgramFiles\WindowsPowerShell\Modules`*  
-2. To import the module: `Import-Module DefenderReferPoint-beta`
+2. To import the module: `Import-Module DefenderReferPoint`
 
 ## Usage
 ### Backup-Env
