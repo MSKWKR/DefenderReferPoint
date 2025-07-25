@@ -4,7 +4,7 @@ Helper function to ensure required modules are installed and imported for the fu
 .PARAMETER Name
 Name of the function calling the helper function.
 #>
-function Ensure-Module{
+function Confirm-Module{
     param(
         [parameter(Mandatory=$true)]
         [string]$Name
@@ -22,14 +22,14 @@ function Ensure-Module{
             else{
                 Write-Host "Required Module: $module not found, please ensure it is installed." -ForegroundColor Red
                 switch($module){
-                    'GroupPolicy'{
+                    "GroupPolicy"{
                         Write-Host "If your machine is a Windows Server try: Install-WindowsFeature GPMC" -ForegroundColor Yellow
                         Write-Host "If your machine is a Windows Client try: Add-WindowsCapability -Online -Name Rsat.GroupPolicy.Management.Tools~~~~0.0.1.0" -ForegroundColor Yellow
                     }
-                    'Defender'{
+                    "Defender"{
                         Write-Host "Please ensure Windows Defender is enabled." -ForegroundColor Yellow
                     }
-                    'DefenderForIdentity'{
+                    "DefenderForIdentity"{
                         Write-Host "To install the module: Install-Module -Name DefenderForIdentity" -ForegroundColor Yellow
                     }
                 }
@@ -64,7 +64,7 @@ function Backup-Env{
         [switch]$Overwrite
     )
     # Load required modules
-    Ensure-Module -Name "Backup-Env"
+    Confirm-Module -Name "Backup-Env"
 
     # Do not allow temp as a folder name
     if ($Name.ToLower() -eq "temp"){
@@ -221,7 +221,7 @@ Applying Attack Surface Reduction rules.
 .PARAMETER ID
 ID of the ASR rule to be applied. Defaults to All.
 .PARAMETER Mode
-The mode to be set for the ASR rule. Defaults to Enable
+The mode to be set for the ASR rule. Defaults to Enable.
 .EXAMPLE
 Set-ASR -ID "All" -Mode "Warn"
 #>
@@ -232,7 +232,7 @@ function Set-ASR{
         [string]$Mode = "Enable"
     )
     # Load required modules
-    Ensure-Module -Name "Set-ASR"
+    Confirm-Module -Name "Set-ASR"
 
     $ID = $ID.ToLower()
     # Hash table of all available ASR rules
@@ -299,40 +299,67 @@ function Set-ASR{
     }
 }
 
+<#
+.SYNOPSIS
+Applying audit settings recommended by Microsoft Defender Identity.
+.PARAMETER Item
+Audit item to be set. Defaults to Default.
+.PARAMETER Mode
+Domain applies the settings via GPO, LocalMachine applies the settings via registry. Defaults to Domain.
+.EXAMPLE
+Set-Audit -Item NTLMAuditing -Mode Domain
+#>
 function Set-Audit{
     param(
-        [string]$Item = "All",
+        [string]$Item = "Default",
         [ValidateSet("Domain", "LocalMachine")]
         [string]$Mode = "Domain"
     )
     # Load required modules
-    Ensure-Module -Name "Set-Audit"
+    Confirm-Module -Name "Set-Audit"
 
     $auditList = @(
-        "All",
+        "Default",
         "AdfsAuditing",
         "AdRecycleBin",
         "AdvancedAuditPolicyCAs",
         "AdvancedAuditPolicyDCs",
         "CAAuditing",
         "ConfigurationContainerAuditing",
-        "EntraConnectAuditing",
-        "RemoteSAM",
+        "EntraConnectAuditing", # Must be in domain mode
+        "RemoteSAM", # Must be in domain mode
         "DomainObjectAuditing",
         "NTLMAuditing",
         "ProcessorPerformance"
     )
     if($auditList.Contains($Item)){
         try{
-            Write-Host "Applying settings of $Item in $Mode mode..."
-            Set-MDIConfiguration -Mode $Mode -Configuration $Item -ErrorAction Stop
+            Write-Host "Applying settings of '$Item' in '$Mode' mode..."
+            switch($Item){
+                "Default"{
+                    $exclude = @("Default", "EntraConnectAuditing", "RemoteSAM")
+                    foreach($auditItem in $auditList | Where-Object { $_ -notin $exclude }){
+                        Set-MDIConfiguration -Mode $Mode -Configuration $auditItem -ErrorAction Stop
+                    }
+                    break
+                }
+                {$_ -in "EntraConnectAuditing", "RemoteSAM"} {
+                    Write-Host "Audit setting '$Item' can only be run in Domain mode." -ForegroundColor Yellow
+                    $identity = Read-Host "Please enter your identity: "
+                    Set-MDIConfiguration -Mode Domain -Configuration $Item -Identity $identity -ErrorAction Stop
+                    break
+                }
+                default{
+                    Set-MDIConfiguration -Mode $Mode -Configuration $Item -ErrorAction Stop
+                }
+            }
         }
         catch{
-            Write-Host "Failed to apply settings of $Item" -ForegroundColor Red
+            Write-Host "Failed to apply settings: $Item" -ForegroundColor Red
             Write-Host $_.Exception.Message -ForegroundColor Red
             throw $_ 
         }
-        Write-Host "Successfully applied settings of $Item to $Mode." -ForegroundColor Cyan
+        Write-Host "Successfully applied settings of '$Item' in '$Mode' mode." -ForegroundColor Cyan
     }
     else{
         Write-Host "The audit setting $Item was not found." -ForegroundColor Red
@@ -344,3 +371,5 @@ function Set-Audit{
         throw "Audit item not within list. Exiting script."
     }
 }
+
+Export-ModuleMember -Function Backup-Env, Set-ASR, Set-Audit
