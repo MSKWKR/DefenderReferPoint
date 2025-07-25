@@ -1,4 +1,48 @@
-Import-Module GroupPolicy
+<#
+.SYNOPSIS
+Helper function to ensure required modules are installed and imported for the function.
+.PARAMETER Name
+Name of the function calling the helper function.
+#>
+function Ensure-Module{
+    param(
+        [parameter(Mandatory=$true)]
+        [string]$Name
+    )
+    $requirementsMap = @{
+        "Backup-Env"    = @("GroupPolicy")
+        "Set-ASR"       = @("Defender")
+        "Set-Audit"     = @("DefenderForIdentity")
+    }
+    foreach($module in $requirementsMap[$Name]){
+        try{
+            if(Get-Module -ListAvailable -Name $module){
+                Import-Module $module
+            }
+            else{
+                Write-Host "Required Module: $module not found, please ensure it is installed." -ForegroundColor Red
+                switch($module){
+                    'GroupPolicy'{
+                        Write-Host "If your machine is a Windows Server try: Install-WindowsFeature GPMC" -ForegroundColor Yellow
+                        Write-Host "If your machine is a Windows Client try: Add-WindowsCapability -Online -Name Rsat.GroupPolicy.Management.Tools~~~~0.0.1.0" -ForegroundColor Yellow
+                    }
+                    'Defender'{
+                        Write-Host "Please ensure Windows Defender is enabled." -ForegroundColor Yellow
+                    }
+                    'DefenderForIdentity'{
+                        Write-Host "To install the module: Install-Module -Name DefenderForIdentity" -ForegroundColor Yellow
+                    }
+                }
+                throw "Module: $module not installed."
+            }
+        }
+        catch{
+            Write-Host "Failed to import module: $module. Exiting script." -ForegroundColor Red
+            Write-Host $_.Exception.Message
+            throw $_
+        }
+    }
+}
 
 <#
 .SYNOPSIS
@@ -19,6 +63,9 @@ function Backup-Env{
         [string]$Name = (Get-Date -Format "yyyy-MM-dd"),
         [switch]$Overwrite
     )
+    # Load required modules
+    Ensure-Module -Name "Backup-Env"
+
     # Do not allow temp as a folder name
     if ($Name.ToLower() -eq "temp"){
         throw "Folder name can't be 'temp', exiting..."
@@ -70,7 +117,7 @@ function Backup-Env{
 
     # Backingup registry settings
     foreach($regType in $regList){
-        $filePath = "$tempFolder\$regType.reg"
+        $filePath = Join-Path $tempFolder "$regType.reg"
         Write-Host "Exporting $regType to $tempFolder..."
         try{
             reg export $regType $filePath /y
@@ -180,10 +227,13 @@ Set-ASR -ID "All" -Mode "Warn"
 #>
 function Set-ASR{
     param(
-        [string]$ID = "all",
+        [string]$ID = "All",
         [ValidateSet("Enable", "Audit", "Warn", "Disable")]
         [string]$Mode = "Enable"
     )
+    # Load required modules
+    Ensure-Module -Name "Set-ASR"
+
     $ID = $ID.ToLower()
     # Hash table of all available ASR rules
     $asrRuleMap = @{
@@ -246,5 +296,51 @@ function Set-ASR{
         Write-Host "Valid rule IDs include:"
         $asrRuleMap.Keys | ForEach-Object { Write-Host "- $_" -ForegroundColor Gray }
         throw "ASR ID not within table. Exiting script."
+    }
+}
+
+function Set-Audit{
+    param(
+        [string]$Item = "All",
+        [ValidateSet("Domain", "LocalMachine")]
+        [string]$Mode = "Domain"
+    )
+    # Load required modules
+    Ensure-Module -Name "Set-Audit"
+
+    $auditList = @(
+        "All",
+        "AdfsAuditing",
+        "AdRecycleBin",
+        "AdvancedAuditPolicyCAs",
+        "AdvancedAuditPolicyDCs",
+        "CAAuditing",
+        "ConfigurationContainerAuditing",
+        "EntraConnectAuditing",
+        "RemoteSAM",
+        "DomainObjectAuditing",
+        "NTLMAuditing",
+        "ProcessorPerformance"
+    )
+    if($auditList.Contains($Item)){
+        try{
+            Write-Host "Applying settings of $Item in $Mode mode..."
+            Set-MDIConfiguration -Mode $Mode -Configuration $Item -ErrorAction Stop
+        }
+        catch{
+            Write-Host "Failed to apply settings of $Item" -ForegroundColor Red
+            Write-Host $_.Exception.Message -ForegroundColor Red
+            throw $_ 
+        }
+        Write-Host "Successfully applied settings of $Item to $Mode." -ForegroundColor Cyan
+    }
+    else{
+        Write-Host "The audit setting $Item was not found." -ForegroundColor Red
+        Write-Host "Please check the item name for typos or formatting" -ForegroundColor Yellow
+        Write-Host "Valid item names include:"
+        $auditList | ForEach-Object{
+            Write-Host "- $_" -ForegroundColor Gray
+        }
+        throw "Audit item not within list. Exiting script."
     }
 }
