@@ -18,8 +18,9 @@ Create a backup folder for all group policy objects and registries.
 **Example usage:**  
 ```powershell
 > Backup-Env -Path "C:\temp\myBackupFolder" -Name "Version1.0" -Overwrite
-> Backup-Env
 ```
+> [!TIP]  
+> You can simply run `Backup-Env` without parameters in the terminal, default settings will be applied.
 
 ### Set-ASR
 Applying Attack Surface Reduction rules.
@@ -29,5 +30,20 @@ Applying Attack Surface Reduction rules.
 **Example usage:**  
 ```powershell
 > Set-ASR -ID "56a863a9-875e-4185-98a7-b882c64b5ce5" -Mode "Warn"
-> Set-ASR
 ```
+> [!TIP]  
+> You can simply run `Set-ASR` without parameters in the terminal, default settings will be applied.
+
+### Set-Audit
+Applying Microsoft Defender Identity recommended audit settings.
+- `-Item`: Audit item to be set. Defaults to Default, which is all settings except for "EntraConnectAuditing" and "RemoteSAM".
+- `-Mode`: Domain applies the settings via GPO, LocalMachine applies the settings via registry. Defaults to Domain.  
+> [!NOTE]  
+> "EntraConnectAuditing" and "RemoteSAM" can only be set under "Domain" mode, a prompt for identity will show.  
+
+**Example usage:**  
+```powershell
+> Set-Audit -Item "NTLMAuditing" -Mode "LocalMachine" 
+```
+> [!TIP]  
+> You can simply run `Set-Audit` without parameters in the terminal, default settings will be applied.
