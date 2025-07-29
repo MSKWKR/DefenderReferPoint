@@ -21,13 +21,15 @@ $asrRuleMap = @{
     "c1db55ab-c21a-4637-bb3f-a12568109d35" = "Use advanced protection against ransomware"
 }
 
-<#
-    .SYNOPSIS
-    Helper function to ensure required modules are installed and imported for the function.
-    .PARAMETER Name
-    Name of the function calling the helper function.
-#>
 function Confirm-Module{
+    <#
+        .SYNOPSIS
+        Helper function to ensure required modules are installed and imported for the function.
+        .PARAMETER Name
+        Name of the function calling the helper function.
+        .Functionality
+        Internal
+    #>
     param(
         [parameter(Mandatory=$true)]
         [string]$Name
@@ -67,20 +69,22 @@ function Confirm-Module{
     }
 }
 
-<#
-    .SYNOPSIS
-    Create a backup folder for all group policy objects and registries.
-    .PARAMETER Path
-    Path to a folder where the backups are saved. Defaults to the 'C:\EnvBackup' folder.
-    .PARAMETER Name
-    Name of the backup folder to be created. Defaults to the backup date.
-    .PARAMETER Overwrite
-    If specified, the folder will be overwritten without prompting.
-    If omitted, the user will be asked whether to overwrite.
-    .EXAMPLE
-    Backup-Env -Path "C:\temp\myBackupFolder" -Name "Version1.0" -Overwrite
-#>
 function Backup-Env{
+    <#
+        .SYNOPSIS
+        Create a backup folder for all group policy objects and registries.
+        .PARAMETER Path
+        Path to a folder where the backups are saved. Defaults to the 'C:\EnvBackup' folder.
+        .PARAMETER Name
+        Name of the backup folder to be created. Defaults to the backup date.
+        .PARAMETER Overwrite
+        If specified, the folder will be overwritten without prompting.
+        If omitted, the user will be asked whether to overwrite.
+        .EXAMPLE
+        Backup-Env -Path "C:\temp\myBackupFolder" -Name "Version1.0" -Overwrite
+        .Functionality
+        Public
+    #>
     param(
         [string]$Path = "C:\EnvBackup",
         [string]$Name = (Get-Date -Format "yyyy-MM-dd"),
@@ -89,17 +93,19 @@ function Backup-Env{
     # Load required modules
     Confirm-Module -Name "Backup-Env"
 
-    <#
-        .SYNOPSIS
-        Helper function for applying operations on folders.
-        .PARAMETER Operation
-        Choose the operation to perform on the folder. Options include: Create, Remove, Copy.
-        .PARAMETER sourcePath
-        Path to the folder to be operated on. If Operation is Copy, this would be the source folder path.
-        .PARAMETER destinationPath
-        Required if Operation is Copy, this is the destination folder path.      
-    #>
     function Modify-Folder{
+        <#
+            .SYNOPSIS
+            Helper function for applying operations on folders.
+            .PARAMETER Operation
+            Choose the operation to perform on the folder. Options include: Create, Remove, Copy.
+            .PARAMETER sourcePath
+            Path to the folder to be operated on. If Operation is Copy, this would be the source folder path.
+            .PARAMETER destinationPath
+            Required if Operation is Copy, this is the destination folder path.
+            .Functionality
+            Internal 
+        #>
         param(
             [ValidateSet("Create", "Remove", "Copy")]
             [string]$Operation,
@@ -224,17 +230,19 @@ function Backup-Env{
     Write-Host "Successfully created backup at $backupFolder." -ForegroundColor Cyan
 }
 
-<#
-    .SYNOPSIS
-    Restoring environment settings from backup.
-    .PARAMETER Path
-    Path to the backup folder.
-    .PARAMETER Mode
-    The settings to be restored. Defaults to All.
-    .EXAMPLE
-    Restore-Env -Path "C:\EnvBackup\<date>" -Mode "ASR"
-#>
 function Restore-Env{
+    <#
+        .SYNOPSIS
+        Restoring environment settings from backup.
+        .PARAMETER Path
+        Path to the backup folder.
+        .PARAMETER Mode
+        The settings to be restored. Defaults to All.
+        .EXAMPLE
+        Restore-Env -Path "C:\EnvBackup\<date>" -Mode "ASR"
+        .Functionality
+        Public
+    #>
     param(
         [PARAMETER(Mandatory=$true)]
         [string]$Path,
@@ -262,18 +270,19 @@ function Restore-Env{
     }
 }
 
-
-<#
-    .SYNOPSIS
-    Applying Attack Surface Reduction rules.
-    .PARAMETER ID
-    ID of the ASR rule to be applied. Defaults to All.
-    .PARAMETER Mode
-    The mode to be set for the ASR rule. Defaults to Enable.
-    .EXAMPLE
-    Set-ASR -ID "All" -Mode "Warn"
-#>
 function Set-ASR{
+    <#
+        .SYNOPSIS
+        Applying Attack Surface Reduction rules.
+        .PARAMETER ID
+        ID of the ASR rule to be applied. Defaults to All.
+        .PARAMETER Mode
+        The mode to be set for the ASR rule. Defaults to Enable.
+        .EXAMPLE
+        Set-ASR -ID "All" -Mode "Warn"
+        .Functionality
+        Public
+    #>
     param(
         [string]$ID = "All",
         [ValidateSet("Enable", "Audit", "Warn", "Disable")]
@@ -282,15 +291,18 @@ function Set-ASR{
     # Load required modules
     Confirm-Module -Name "Set-ASR"
     $ID = $ID.ToLower()
-    <#
-        .SYNOPSIS
-        Helper function for Apply-ASR, which applies a single ASR rule.
-        .PARAMETER ruleId
-        ID of the ASR rule to be applied.
-        .PARAMETER Mode
-        The mode to be set for the ASR rule.
-    #>
+
     function Apply-SingleASR{
+        <#
+            .SYNOPSIS
+            Helper function for Apply-ASR, which applies a single ASR rule.
+            .PARAMETER ruleId
+            ID of the ASR rule to be applied.
+            .PARAMETER Mode
+            The mode to be set for the ASR rule.
+            .Functionality
+            Internal
+        #>
         param(
             [string]$ruleId,
             [string]$Mode
@@ -324,17 +336,19 @@ function Set-ASR{
     }
 }
 
-<#
-    .SYNOPSIS
-    Applying audit settings recommended by Microsoft Defender Identity.
-    .PARAMETER Item
-    Audit item to be set. Defaults to Default.
-    .PARAMETER Mode
-    Domain applies the settings via GPO, LocalMachine applies the settings via registry. Defaults to Domain.
-    .EXAMPLE
-    Set-Audit -Item NTLMAuditing -Mode Domain
-#>
 function Set-Audit{
+    <#
+        .SYNOPSIS
+        Applying audit settings recommended by Microsoft Defender Identity.
+        .PARAMETER Item
+        Audit item to be set. Defaults to Default.
+        .PARAMETER Mode
+        Domain applies the settings via GPO, LocalMachine applies the settings via registry. Defaults to Domain.
+        .EXAMPLE
+        Set-Audit -Item NTLMAuditing -Mode Domain
+        .Functionality
+        Public
+    #>
     param(
         [string]$Item = "Default",
         [ValidateSet("Domain", "LocalMachine")]
