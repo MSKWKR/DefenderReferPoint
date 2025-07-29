@@ -22,10 +22,10 @@ $asrRuleMap = @{
 }
 
 <#
-.SYNOPSIS
-Helper function to ensure required modules are installed and imported for the function.
-.PARAMETER Name
-Name of the function calling the helper function.
+    .SYNOPSIS
+    Helper function to ensure required modules are installed and imported for the function.
+    .PARAMETER Name
+    Name of the function calling the helper function.
 #>
 function Confirm-Module{
     param(
@@ -68,17 +68,17 @@ function Confirm-Module{
 }
 
 <#
-.SYNOPSIS
-Create a backup folder for all group policy objects and registries.
-.PARAMETER Path
-Path to a folder where the backups are saved. Defaults to the 'C:\EnvBackup' folder.
-.PARAMETER Name
-Name of the backup folder to be created. Defaults to the backup date.
-.PARAMETER Overwrite
-If specified, the folder will be overwritten without prompting.
-If omitted, the user will be asked whether to overwrite.
-.EXAMPLE
-Backup-Env -Path "C:\temp\myBackupFolder" -Name "Version1.0" -Overwrite
+    .SYNOPSIS
+    Create a backup folder for all group policy objects and registries.
+    .PARAMETER Path
+    Path to a folder where the backups are saved. Defaults to the 'C:\EnvBackup' folder.
+    .PARAMETER Name
+    Name of the backup folder to be created. Defaults to the backup date.
+    .PARAMETER Overwrite
+    If specified, the folder will be overwritten without prompting.
+    If omitted, the user will be asked whether to overwrite.
+    .EXAMPLE
+    Backup-Env -Path "C:\temp\myBackupFolder" -Name "Version1.0" -Overwrite
 #>
 function Backup-Env{
     param(
@@ -89,55 +89,57 @@ function Backup-Env{
     # Load required modules
     Confirm-Module -Name "Backup-Env"
 
-    # Do not allow temp as a folder name
-    if ($Name.ToLower() -eq "temp"){
-        throw "Folder name can't be 'temp', exiting..."
+    <#
+        .SYNOPSIS
+        Helper function for applying operations on folders.
+        .PARAMETER Operation
+        Choose the operation to perform on the folder. Options include: Create, Remove, Copy.
+        .PARAMETER sourcePath
+        Path to the folder to be operated on. If Operation is Copy, this would be the source folder path.
+        .PARAMETER destinationPath
+        Required if Operation is Copy, this is the destination folder path.      
+    #>
+    function Modify-Folder{
+        param(
+            [ValidateSet("Create", "Remove", "Copy")]
+            [string]$Operation,
+            [string]$sourcePath,
+            [string]$destinationPath
+        )
+        try{
+            switch($Operation){
+                "Create"    { New-Item -Path $sourcePath -ItemType Directory -ErrorAction Stop > $null }
+                "Remove"    { Remove-Item $sourcePath -Recurse -Force -ErrorAction Stop }
+                "Copy"      { robocopy $sourcePath $destinationPath /MIR /log:$env:TEMP\robocopy.log }  # Dump the log at %temp%
+            }
+            Write-Host "Successfully $Operation folder: $sourcePath" -ForegroundColor Cyan
+        }
+        catch{
+            Write-Host "Failed to $Operation folder: $sourcePath" -ForegroundColor Red
+            Write-Host $_.Exception.Message -ForegroundColor Red
+            throw $_
+        }
     }
 
     # Preparing backup directory
     if(!(Test-Path $Path)){
         Write-Host "Backup directory does not exist, creating directory at $Path..."
-        try{
-            New-Item -Path $Path -ItemType Directory -ErrorAction Stop > $null
-            Write-Host "Backup directory successfully created at $Path" -ForegroundColor Cyan
-        }
-        catch{
-            Write-Host "Failed to create directory: $Path" -ForegroundColor Red
-            Write-Host $_.Exception.Message -ForegroundColor Red
-            throw $_
-        }
+        Modify-Folder -Operation Create -sourcePath $Path
     }
     else{
         Write-Host "Backup directory exists, proceeding..." -ForegroundColor Cyan
     }
-    
-    # Preparing temp folder
-    $tempFolder = Join-Path -Path $Path -ChildPath "temp"
+
+    # Preparing temp folder in %temp%
+    $tempFolder = Join-Path -Path $env:TEMP -ChildPath "derp_temp"
     if((Test-Path $tempFolder)){
-        try{
-            Write-Host "Removing unresolved temp folder..."
-            Remove-Item $tempFolder -Recurse -Force -ErrorAction Stop
-        }
-        catch{
-            Write-Host "Failed to remove unresolved temp folder: $tempFolder" -ForegroundColor Red
-            Write-Host $_.Exception.Message -ForegroundColor Red
-            throw $_
-        }
+        Write-Host "Removing unresolved temp folder..."
+        Modify-Folder -Operation Remove -sourcePath $tempFolder
     }
     Write-Host "Creating temp folder..."
-    try{
-        New-Item -Path $tempFolder -ItemType Directory -ErrorAction Stop > $null
-        Write-Host "Temp folder successfully created at $tempFolder" -ForegroundColor Cyan
-    }
-    catch{
-        Write-Host "Failed to create temp folder: $tempFolder" -ForegroundColor Red
-        Write-Host $_.Exception.Message -ForegroundColor Red
-        throw $_
-    }
-
-    # List of registry folders to back up.
-    $regList = @("HKLM")
-
+    Modify-Folder -Operation Create -sourcePath $tempFolder
+    
+    $regList = @("HKLM")    # List of registry folders to back up.
     # Backingup registry settings
     foreach($regType in $regList){
         $filePath = Join-Path $tempFolder "$regType.reg"
@@ -167,10 +169,18 @@ function Backup-Env{
     
     # Backingup ASR settings from MpPreference
     $asrValueMap = @{}
-    $MpPreference = Get-MpPreference
-    $asrList = @($($MpPreference | Select-Object -ExpandProperty AttackSurfaceReductionRules_Ids))
-    foreach($asrId in $asrList){
-        $asrValueMap[$asrId] = $MpPreference.AttackSurfaceReductionRules_Actions[$MpPreference.AttackSurfaceReductionRules_Ids.Indexof($asrId)]
+    try{
+        $MpPreference = Get-MpPreference
+        $asrList = @($($MpPreference | Select-Object -ExpandProperty AttackSurfaceReductionRules_Ids))
+        foreach($asrId in $asrList){
+            $asrValueMap[$asrId] = $MpPreference.AttackSurfaceReductionRules_Actions[$MpPreference.AttackSurfaceReductionRules_Ids.Indexof($asrId)]
+        }
+        $asrValueMap | ConvertTo-Json | Out-File -FilePath $tempFolder\asr.json
+    }
+    catch{
+        Write-Host "Failed to export ASR settings to $tempFolder" -ForegroundColor Red
+        Write-Host $_.Exception.Message -ForegroundColor Red
+        throw $_
     }
 
     # Copying contents from temp into target folder
@@ -183,15 +193,6 @@ function Backup-Env{
                 $response = Read-Host "Do you want to overwrite the file? (yes/no)"
                 $response = $response.ToLower()
                 if($response -eq "yes" -or $response -eq "y"){
-                    try{
-                        Write-Host "Overwriting..."
-                        robocopy $tempFolder $backupFolder /mir /log:$backupFolder\robocopy.log
-                    }
-                    catch{
-                        Write-Host "Failed to overwrite folder: $backupFolder" -ForegroundColor Red
-                        Write-Host $_.Exception.Message -ForegroundColor Red
-                        throw $_
-                    }
                     break
                 }
                 elseif($response -eq "no" -or $response -eq "n"){
@@ -208,53 +209,69 @@ function Backup-Env{
                 }
             } while ($true)  
         }
-        # If overwrite tag is specified then proceed without prompt
-        else{
-            try{
-                Write-Host "Overwriting..."
-                robocopy $tempFolder $backupFolder /mir /log:$backupFolder\robocopy.log
-            }
-            catch{
-                Write-Host "Failed to overwrite folder: $backupFolder" -ForegroundColor Red
-                Write-Host $_.Exception.Message -ForegroundColor Red
-                throw $_
-            }            
-        }
+        Write-Host "Overwriting..."
+        Modify-Folder -Operation Copy -sourcePath $tempFolder -destinationPath $backupFolder
     }
     else{
         Write-Host "Creating backup at $backupFolder..."
-        try{
-            New-Item -Path $backupFolder -ItemType Directory -ErrorAction Stop > $null
-            robocopy $tempFolder $backupFolder /mir /log:$backupFolder\robocopy.log
-        }
-        catch{
-            Write-Host "Failed to create backup: $backupFolder" -ForegroundColor Red
-            Write-Host $_.Exception.Message -ForegroundColor Red
-            throw $_
-        }
+        Modify-Folder -Operation Create -sourcePath $backupFolder
+        Modify-Folder -Operation Copy -sourcePath $tempFolder -destinationPath $backupFolder
     }
     # Remove temp folder as it is not needed anymore
-    try{
-        Write-Host "Removing temp folder..."
-        Remove-Item -Path $tempFolder -Recurse -Force -ErrorAction Stop
-    }
-    catch{
-        Write-Host "Failed to remove temp folder: $tempFolder" -ForegroundColor Red
-        Write-Host $_.Exception.Message -ForegroundColor Red
-    }
+    Write-Host "Removing temp folder..."
+    Modify-Folder -Operation Remove -sourcePath $tempFolder
 
     Write-Host "Successfully created backup at $backupFolder." -ForegroundColor Cyan
 }
 
 <#
-.SYNOPSIS
-Applying Attack Surface Reduction rules.
-.PARAMETER ID
-ID of the ASR rule to be applied. Defaults to All.
-.PARAMETER Mode
-The mode to be set for the ASR rule. Defaults to Enable.
-.EXAMPLE
-Set-ASR -ID "All" -Mode "Warn"
+    .SYNOPSIS
+    Restoring environment settings from backup.
+    .PARAMETER Path
+    Path to the backup folder.
+    .PARAMETER Mode
+    The settings to be restored. Defaults to All.
+    .EXAMPLE
+    Restore-Env -Path "C:\EnvBackup\<date>" -Mode "ASR"
+#>
+function Restore-Env{
+    param(
+        [PARAMETER(Mandatory=$true)]
+        [string]$Path,
+        [ValidateSet("All", "ASR", "Audit")]
+        [string]$Mode = "All"
+    )
+    $Mode = $Mode.ToLower()
+    if(Test-Path $Path){
+        switch($Mode){
+            "all"{
+
+            }
+            "asr"{
+
+            }
+            "audit"{
+
+            }
+        }
+    }
+    else{
+        Write-Host "Backup folder not found, please check for typos or formatting." -ForegroundColor Red
+        Write-Host "eg: C:\EnvBackup\<date>" -ForegroundColor Yellow
+        throw "Path invalid. Exiting script."
+    }
+}
+
+
+<#
+    .SYNOPSIS
+    Applying Attack Surface Reduction rules.
+    .PARAMETER ID
+    ID of the ASR rule to be applied. Defaults to All.
+    .PARAMETER Mode
+    The mode to be set for the ASR rule. Defaults to Enable.
+    .EXAMPLE
+    Set-ASR -ID "All" -Mode "Warn"
 #>
 function Set-ASR{
     param(
@@ -266,12 +283,12 @@ function Set-ASR{
     Confirm-Module -Name "Set-ASR"
     $ID = $ID.ToLower()
     <#
-    .SYNOPSIS
-    Helper function for Apply-ASR, which applies a single ASR rule.
-    .PARAMETER ruleId
-    ID of the ASR rule to be applied.
-    .PARAMETER Mode
-    The mode to be set for the ASR rule.
+        .SYNOPSIS
+        Helper function for Apply-ASR, which applies a single ASR rule.
+        .PARAMETER ruleId
+        ID of the ASR rule to be applied.
+        .PARAMETER Mode
+        The mode to be set for the ASR rule.
     #>
     function Apply-SingleASR{
         param(
@@ -308,14 +325,14 @@ function Set-ASR{
 }
 
 <#
-.SYNOPSIS
-Applying audit settings recommended by Microsoft Defender Identity.
-.PARAMETER Item
-Audit item to be set. Defaults to Default.
-.PARAMETER Mode
-Domain applies the settings via GPO, LocalMachine applies the settings via registry. Defaults to Domain.
-.EXAMPLE
-Set-Audit -Item NTLMAuditing -Mode Domain
+    .SYNOPSIS
+    Applying audit settings recommended by Microsoft Defender Identity.
+    .PARAMETER Item
+    Audit item to be set. Defaults to Default.
+    .PARAMETER Mode
+    Domain applies the settings via GPO, LocalMachine applies the settings via registry. Defaults to Domain.
+    .EXAMPLE
+    Set-Audit -Item NTLMAuditing -Mode Domain
 #>
 function Set-Audit{
     param(
@@ -380,4 +397,4 @@ function Set-Audit{
     }
 }
 
-Export-ModuleMember -Function Backup-Env, Set-ASR, Set-Audit
+Export-ModuleMember -Function Backup-Env, Restore-Env, Set-ASR, Set-Audit
