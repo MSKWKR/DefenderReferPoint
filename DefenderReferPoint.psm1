@@ -115,8 +115,8 @@ function Backup-Env{
         try{
             switch($Operation){
                 "Create"    { New-Item -Path $sourcePath -ItemType Directory -ErrorAction Stop > $null }
-                "Remove"    { Remove-Item $sourcePath -Recurse -Force -ErrorAction Stop }
-                "Copy"      { robocopy $sourcePath $destinationPath /MIR /log:$env:TEMP\robocopy.log }  # Dump the log at %temp%
+                "Remove"    { Remove-Item -Path $sourcePath -Recurse -Force -ErrorAction Stop }
+                "Copy"      { Copy-Item -Path $sourcePath\* -Destination $destinationPath -Recurse -Force -ErrorAction Stop}
             }
             Write-Host "Successfully $Operation folder: $sourcePath" -ForegroundColor Cyan
         }
@@ -144,22 +144,6 @@ function Backup-Env{
     }
     Write-Host "Creating temp folder..."
     Modify-Folder -Operation Create -sourcePath $tempFolder
-    
-    $regList = @("HKLM")    # List of registry folders to back up.
-    # Backingup registry settings
-    foreach($regType in $regList){
-        $filePath = Join-Path $tempFolder "$regType.reg"
-        Write-Host "Exporting $regType to $tempFolder..."
-        try{
-            reg export $regType $filePath /y
-            Write-Host "Successfully exported $regType settings to $filePath" -ForegroundColor Cyan 
-        }
-        catch{
-            Write-Host "Failed to export $regType settings to $tempFolder" -ForegroundColor Red
-            Write-Host $_.Exception.Message -ForegroundColor Red
-            throw $_
-        }
-    }
     
     # Backingup GPO settings
     Write-Host "Exporting all GPO backup to $tempFolder..."
@@ -216,6 +200,8 @@ function Backup-Env{
             } while ($true)  
         }
         Write-Host "Overwriting..."
+        Modify-Folder -Operation Remove -sourcePath $backupFolder
+        Modify-Folder -Operation Create -sourcePath $backupFolder
         Modify-Folder -Operation Copy -sourcePath $tempFolder -destinationPath $backupFolder
     }
     else{
@@ -250,16 +236,81 @@ function Restore-Env{
         [string]$Mode = "All"
     )
     $Mode = $Mode.ToLower()
+    function Restore-ASRBackup{
+        param(
+            [string]$Path
+        )
+        $asrPath = Join-Path -Path $Path -ChildPath "asr.json"
+        if(Test-Path $asrPath){
+            try{
+                $asrJSON = Get-Content -Raw $asrPath | ConvertFrom-Json
+                $asrValueMap = @{}
+                foreach($asrId in $asrJSON.PSObject.Properties){
+                    $asrValueMap[$asrId.Name] = $asrId.Value
+                }
+            }
+            catch{
+                Write-Host "Unable to convert file to hashtable. Please ensure asr.json is in JSON format." -ForegroundColor Red
+                Write-Host $_.Exception.Message -ForegroundColor Red
+                throw $_
+            }
+            foreach($ruleId in $asrValueMap.Keys){
+                try{
+                    Write-Host "Applying [$ruleId] settings..."
+                    Add-MpPreference -AttackSurfaceReductionRules_Ids $ruleId -AttackSurfaceReductionRules_Actions $($asrValueMap[$ruleId]) -ErrorAction Stop
+                    Write-Host "Successfully set [$ruleId] to $($asrValueMap[$ruleId]) mode." -ForegroundColor Cyan
+                }
+                catch{
+                    Write-Host "Unable to apply settings to [$ruleId]." -ForegroundColor Red
+                    Write-Host $_.Exception.Message -ForegroundColor Red
+                    throw $_
+                }
+            }
+        }
+        else{
+            Write-Host "ASR settings not found within backup folder: $asrPath" -ForegroundColor Red
+            return
+        }        
+    }
+
+    function Restore-AuditBackup{
+        param(
+            [string]$Path
+        )
+        # Set GPO
+        try{
+            $gpoList = @($(Get-ChildItem -Path $Path -Directory | Select-Object -ExpandProperty Name | ForEach-Object { $_.Trim('{}') }))
+        }
+        catch{
+            Write-Host "Unable to fetch GPO backup folders." -ForegroundColor Red
+        }
+        foreach($backupId in $gpoList){
+            try{
+                Write-Host "Restoring GPO [$backupId] settings..."
+                Restore-GPO -Path $Path -BackupId $backupId
+            }
+            catch{
+                Write-Host "Failed to restore GPO: $backupId" -ForegroundColor Red
+                throw
+            }
+            Write-Host "Successfully restored GPO [$backupId] settings." -ForegroundColor Cyan
+        }
+    }
+
     if(Test-Path $Path){
         switch($Mode){
             "all"{
-
+                Restore-ASRBackup -Path $Path
+                Restore-AuditBackup -Path $Path
+                break
             }
             "asr"{
-
+                Restore-ASRBackup -Path $Path
+                break
             }
             "audit"{
-
+                Restore-AuditBackup -Path $Path
+                break
             }
         }
     }
@@ -292,10 +343,10 @@ function Set-ASR{
     Confirm-Module -Name "Set-ASR"
     $ID = $ID.ToLower()
 
-    function Apply-SingleASR{
+    function Set-SingleASR{
         <#
             .SYNOPSIS
-            Helper function for Apply-ASR, which applies a single ASR rule.
+            Helper function for Set-ASR, which applies a single ASR rule.
             .PARAMETER ruleId
             ID of the ASR rule to be applied.
             .PARAMETER Mode
@@ -321,11 +372,11 @@ function Set-ASR{
     
     if($ID -eq "all"){
         foreach($ruleId in $asrRuleMap.Keys){
-            Apply-SingleASR -ruleID $ruleId -Mode $Mode
+            Set-SingleASR -ruleID $ruleId -Mode $Mode
         }
     }
     elseif($asrRuleMap.ContainsKey($ID)){
-        Apply-SingleASR -ruleId $ID -Mode $Mode
+        Set-SingleASR -ruleId $ID -Mode $Mode
     }
     else{
         Write-Host "The ASR ID '$ID' was not found." -ForegroundColor Red
