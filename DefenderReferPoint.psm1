@@ -237,6 +237,14 @@ function Restore-Env{
     )
     $Mode = $Mode.ToLower()
     function Restore-ASRBackup{
+        <#
+            .SYNOPSIS
+            Helper function for applying ASR preferences from backup folder.
+            .PARAMETER Path
+            Path to the backup folder.
+            .Functionality
+            Internal
+        #>
         param(
             [string]$Path
         )
@@ -274,6 +282,14 @@ function Restore-Env{
     }
 
     function Restore-AuditBackup{
+        <#
+            .SYNOPSIS
+            Helper function for applying GPOs from backup folder.
+            .PARAMETER Path
+            Path to the backup folder.
+            .Functionality
+            Internal
+        #>
         param(
             [string]$Path
         )
