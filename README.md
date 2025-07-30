@@ -10,7 +10,7 @@ eg: *`C:\ProgramFiles\WindowsPowerShell\Modules`*
 
 ## Usage
 ### Backup-Env
-Create a backup folder for all group policy objects and registries.  
+Create a backup folder for all Group policy objects and Attack surface reduction preferences.  
 - `-Path`: Path to a folder where the backups are saved. Defaults to the *`C:\EnvBackup`* folder.
 - `-Name`: Name of the backup folder to be created. Defaults to the backup date.
 - `-Overwrite`: If specified, the folder will be overwritten without prompting. If omitted, the user will be asked whether to overwrite.
@@ -21,6 +21,19 @@ Create a backup folder for all group policy objects and registries.
 ```
 > [!TIP]  
 > You can simply run `Backup-Env` without parameters in the terminal, default settings will be applied.
+
+### Restore-Env
+Restore settings based on contents of the backup folder.  
+- `-Path`: Path to a folder where the backups are saved.
+- `-Mode`: The settings to be restored. Defaults to All.
+> [!NOTE]  
+> `-Path` is **MANDATORY**, it must be specified.  
+
+**Example usage:**  
+```powershell
+> Restore-Env -Path "C:\temp\myBackupFolder" -Mode "Audit"
+```
+
 
 ### Set-ASR
 Applying Attack Surface Reduction rules.
