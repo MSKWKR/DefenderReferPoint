@@ -26,6 +26,9 @@ Create a backup folder for all Group policy objects and Attack surface reduction
 Restore settings based on contents of the backup folder.  
 - `-Path`: Path to a folder where the backups are saved.
 - `-Mode`: The settings to be restored. Defaults to All.
+    - `All`: Include all settings below.
+    - `ASR`: Include ASR preferences.
+    - `Audit`: Include Group policy objects.
 > [!NOTE]  
 > `-Path` is **MANDATORY**, it must be specified.  
 
@@ -39,6 +42,10 @@ Restore settings based on contents of the backup folder.
 Applying Attack Surface Reduction rules.
 - `-ID`: ID of the ASR rule to be applied. Defaults to All.
 - `-Mode`: The mode to be set for the ASR rule. Defaults to Enable.
+    - `Disable`: Rule disabled.
+    - `Enable`: Rule enabled.
+    - `Audit`: Rule is evaulated but not enforced.
+    - `Warn`: Rule is enabled and notifies end-user, but permits end-user to bypass the block. 
 
 **Example usage:**  
 ```powershell
