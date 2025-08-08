@@ -1,4 +1,4 @@
-# This file configures Attack Surface Reduction Rules for Defender Endpoint
+# This file configures Attack Surface Reduction Rules
 
 # Hash table of all available ASR rules
 $asrRuleMap = @{
@@ -23,9 +23,37 @@ $asrRuleMap = @{
     "c1db55ab-c21a-4637-bb3f-a12568109d35" = "Use advanced protection against ransomware"
 }
 
-# Setting Attack Surface Reduction Rules using PowerShell method
+<#
+# Setting Attack Surface Reduction Rules using PowerShell method by changing local registry values
 foreach($ruleId in $asrRuleMap.Keys){
     Write-Host "Enabling ASR rule: $($asrRuleMap[$ruleId]) [$ruleId]"
     Add-MpPreference -AttackSurfaceReductionRules_Ids $ruleId -AttackSurfaceReductionRules_Actions Enabled
 }
 Write-Host "All ASR rules have been set to Block mode"
+#>
+# Set-GPRegistryValue -Name $gpoName -Key $registryPath -ValueName $ruleId -Type DWord -Value $mode
+
+$gpoName = "EndpointRecommendedSettings"
+$registryPath = "HKLM\Software\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\ASR\Rules"
+$mode = 0
+$retries = 3
+$delay = 2
+
+foreach ($ruleId in $asrRuleMap.Keys){
+    Write-Host "Setting ASR rule in GPO: $($asrRuleMap[$ruleId]) [$ruleId]"
+    for ($attempt = 1; $attempt -le $retries; $attempt++){
+        try{
+            Set-GPRegistryValue -Name $gpoName -Key $registryPath -ValueName $ruleId -Type DWord -Value $mode -ErrorAction Stop > $null
+            Write-Host "Configured ASR rule in GPO: $($asrRuleMap[$ruleId]) [$ruleId]" -ForegroundColor Cyan
+            break
+        }
+        catch{
+            Write-Host "Failed to configure ASR rule in GPO: $($asrRuleMap[$ruleId]) [$ruleId]" -ForegroundColor Red
+            Write-Host $_.Exception.Message -ForegroundColor Red
+            if ($attempt -lt $retries){
+                Write-Host "Retrying..." -ForegroundColor Yellow
+                Start-Sleep -Seconds $delay
+            }
+        }
+    }
+}
